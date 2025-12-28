@@ -1,0 +1,23 @@
+@import 'tailwindcss';
+
+@layer base {
+  :root {
+    @apply scheme-light-dark font-sans text-stone-950 bg-stone-50;
+
+    @variant dark {
+      @apply text-stone-50/85 bg-stone-900;
+    }
+  }
+
+  body {
+    @apply grid place-items-center min-w-[320px] min-h-screen relative m-0;
+  }
+}
+
+@media (prefers-reduced-motion) {
+  *,
+  ::before,
+  ::after {
+    animation: none !important;
+  }
+}
