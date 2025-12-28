@@ -1,28 +1,35 @@
 import { useRef, useState, type FormEvent } from "react";
 
+import {useQuery} from '@tanstack/react-query'
+
 const API_PATH = 'http://localhost:3000'
-const sources = ['a', 'b', 'c', 'd'];
+const SOURCES = ['a', 'b', 'c', 'd'];
+const DEFAULT_SOURCE = 'a';
 
 
 export function APITester() {
-  const [hasData, setHasData] = useState(false)
   const responseInputRef = useRef<HTMLTextAreaElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const [source, setSource] = useState(DEFAULT_SOURCE);
+
+  const { refetch } = useQuery({
+    queryKey: ['data'],
+    queryFn: () => fetch(`${API_PATH}/${source}`).then(async (res) => {
+      const resBody = await res.json()
+      const formattedResponse = JSON.stringify(resBody, null, 2);
+      responseInputRef.current!.value = formattedResponse;
+      return formattedResponse;
+    }
+  ),
+  });
 
   const testEndpoint = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
-    try {
-      const form = formRef.current!;
-      const formData = new FormData(form);
-      const selectedSource = formData.get("source") as string;
-      const res = await fetch(`${API_PATH}/${selectedSource}`);
-      const resBody = await res.json();
-      responseInputRef.current!.value = JSON.stringify(resBody, null, 2);
-      setHasData(true);
-    } catch (error) {
-      responseInputRef.current!.value = String(error);
-    }
+    const selectedSource = new FormData(formRef.current!).get("source") as string;
+    setSource(() => selectedSource);
+    setTimeout(() => {
+      refetch();
+    }, 0)
   };
 
   return (
@@ -37,27 +44,18 @@ export function APITester() {
           onChange={() => formRef.current?.requestSubmit()}
           name="source"
           id="source"
-          className="bg-[#fbf0df] text-[#1a1a1a] py-2 px-4 border-r-8 border-transparent rounded-lg font-bold text-sm min-w-0 cursor-pointer hover:bg-[#f3d5a3] transition-colors duration-100 uppercase text-center"
+          className="bg-[#fbf0df] text-[#1a1a1a] py-2 px-4 border-r-8 border-transparent rounded-lg font-bold text-sm min-w-0 cursor-pointer hover:bg-[#f3d5a3] transition-colors duration-100 uppercase text-center ml-auto"
         >
-          {sources.map((v) => (
+          {SOURCES.map((v) => (
             <option key={`select-value-${v}`} value={v} className="py-1 text-center uppercase">{v}</option>)
           )}
         </select>
-        
-        <button
-          disabled={hasData}
-          type="submit"
-          className="bg-[#fbf0df] text-[#1a1a1a] border-0 px-5 py-1.5 rounded-lg font-bold transition-all duration-100 hover:bg-[#f3d5a3] hover:-translate-y-px cursor-pointer whitespace-nowrap ml-auto"
-        >
-          Load
-        </button>
       </form>
       <textarea
         ref={responseInputRef}
         readOnly
         placeholder="Response will appear here..."
-        className="w-full min-h-96 bg-[#1a1a1a] border-2 border-[#fbf0df] rounded-xl p-3 text-[#fbf0df] font-mono resize-y focus:border-[#f3d5a3] placeholder-[#fbf0df]/40"
-      />
+        className="w-full min-h-96 bg-[#1a1a1a] border-2 border-[#fbf0df] rounded-xl p-3 text-[#fbf0df] font-mono resize-y focus:border-[#f3d5a3] placeholder-[#fbf0df]/40"/>
     </div>
   );
 }
