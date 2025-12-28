@@ -1,0 +1,32 @@
+[
+  {
+    "entryId": "a1",
+    "timestamp": "2024-11-01T08:15:00Z",
+    "foodName": "Oats",
+    "serving": {
+      "amount": 60,
+      "unit": "g"
+    },
+    "macros": {
+      "protein_g": 7,
+      "carbs_g": 36,
+      "fat_g": 5
+    },
+    "calories_kcal": 220
+  },
+  {
+    "entryId": "a2",
+    "timestamp": "2024-11-01T13:00:00Z",
+    "foodName": "Correction Entry",
+    "serving": {
+      "amount": 1,
+      "unit": "serving"
+    },
+    "macros": {
+      "protein_g": -5,
+      "carbs_g": -20,
+      "fat_g": -3
+    },
+    "calories_kcal": -120
+  }
+]

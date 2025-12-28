@@ -1,0 +1,33 @@
+[
+  {
+    "source": "brand-db",
+    "item": {
+      "label": "Greek Yogurt",
+      "brand": "Generic"
+    },
+    "logged_at": "2024-11-02T07:45:00Z",
+    "serving_grams": 150,
+    "nutrients": [
+      { "key": "protein", "value": 15, "unit": "g" },
+      { "key": "carbohydrate", "value": 6, "unit": "g" },
+      { "key": "fat", "value": 4, "unit": "g" },
+      { "key": "energy", "value": 110, "unit": "kcal" }
+    ]
+  },
+  {
+    "source": "brand-db",
+    "item": {
+      "label": "Protein Bar",
+      "brand": "FitCo"
+    },
+    "logged_at": "2024-11-02T10:30:00Z",
+    "serving_grams": 60,
+    "nutrients": [
+      { "key": "protein", "value": 20, "unit": "g" },
+      { "key": "protein", "value": 25, "unit": "g" },
+      { "key": "carbohydrate", "value": 22, "unit": "g" },
+      { "key": "fat", "value": 8, "unit": "g" },
+      { "key": "energy", "value": 240, "unit": "kcal" }
+    ]
+  }
+]
