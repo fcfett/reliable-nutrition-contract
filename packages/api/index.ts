@@ -3,6 +3,7 @@ import sourceA from "./data/entries.source-a.json";
 import sourceB from "./data/entries.source-b.json";
 import sourceC from "./data/entries.source-c.json";
 import sourceD from "./data/entries.source-d.json";
+import { normalizeEntries } from "./normalize";
 
 const API_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -25,11 +26,17 @@ const sources: Record<string, Object> = {
   d: sourceD
 };
 
+const parseDataSource = (dataSource?: Object) => {
+  if (!dataSource) return undefined
+
+  return {data: normalizeEntries(dataSource as unknown[])};
+}
+
 const server = serve({
   port: 3000,
   routes: {
     "/:source": async req => {
-      const dataSource = sources[req.params.source];
+      const dataSource = parseDataSource(sources[req.params.source]);
       return new Response(
         JSON.stringify(dataSource ?? SOURCE_NOT_FOUND_ERROR),
         {
