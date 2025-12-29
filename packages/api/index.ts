@@ -14,10 +14,11 @@ const API_HEADERS = {
   "Content-Type": "application/json",
 };
 
-const SOURCE_NOT_FOUND_ERROR = {
-  statusText: "Source Not Found",
+
+const getSourceNotFoundError = (source: unknown) => ({
+  statusText: `Source "${source}" Not Found`,
   status: 400
-}
+})
 
 const sources: Record<string, Object> = {
   a: sourceA,
@@ -36,12 +37,13 @@ const server = serve({
   port: 3000,
   routes: {
     "/:source": async req => {
-      const dataSource = parseDataSource(sources[req.params.source]);
+      const { source } = req.params
+      const dataSource = parseDataSource(sources[source]);
       return new Response(
-        JSON.stringify(dataSource ?? SOURCE_NOT_FOUND_ERROR),
+        JSON.stringify(dataSource ?? getSourceNotFoundError(source)),
         {
           headers: API_HEADERS,
-          ...(!dataSource && SOURCE_NOT_FOUND_ERROR)
+          ...(!dataSource && getSourceNotFoundError(source))
         }
       );
     },

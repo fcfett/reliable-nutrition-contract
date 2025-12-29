@@ -1,5 +1,7 @@
+const VALID_SERVING_UNITS = ['ml', 'g', 'tbsp'] as const;
+
 // Consistent schema for nutrition entries
-export interface NormalizedEntry {
+export type NormalizedEntry = {
   id: string;
   timestamp: string;
   foodName: string;
@@ -8,15 +10,15 @@ export interface NormalizedEntry {
     unit: string;
   };
   macros: {
-    protein_g: number;
-    carbs_g: number;
-    fat_g: number;
+    protein: number;
+    carbs: number;
+    fat: number;
   };
   calories: number | null;
   metadata?: Record<string, unknown>;
   issues?: {
     invalid?: Array<keyof NormalizedEntry>;
-    unkown?: Array<keyof NormalizedEntry>;
+    unknown?: Array<keyof NormalizedEntry>;
     inconsistent?: Array<keyof NormalizedEntry>;
   }
 }
@@ -124,7 +126,7 @@ function toNumberOrNull(value: string | number | null | undefined): number | nul
 }
 
 // Valid serving units
-const VALID_SERVING_UNITS = ['ml', 'g', 'tbsp'] as const;
+
 
 // Helper function to validate serving unit
 function isValidServingUnit(unit: string): boolean {
@@ -132,9 +134,12 @@ function isValidServingUnit(unit: string): boolean {
 }
 
 // Helper function to validate and populate issues for a normalized entry
-function validateEntry(entry: Omit<NormalizedEntry, 'issues'>): NormalizedEntry {
+function validateEntry(
+  entry: Omit<NormalizedEntry, 'issues'>,
+  unknownFields: Array<keyof NormalizedEntry> = []
+): NormalizedEntry {
   const invalid: Array<keyof NormalizedEntry> = [];
-  const unkown: Array<keyof NormalizedEntry> = [];
+  const unknown: Array<keyof NormalizedEntry> = [...unknownFields];
   const inconsistent: Array<keyof NormalizedEntry> = [];
 
   // Validate serving unit
@@ -143,19 +148,20 @@ function validateEntry(entry: Omit<NormalizedEntry, 'issues'>): NormalizedEntry 
   }
 
   // Validate calories consistency if calories are provided
-  if (entry.calories !== null && typeof entry.calories === 'number') {
-    const calculatedCalories = calcCalories(
-      entry.macros.protein_g,
-      entry.macros.carbs_g,
-      entry.macros.fat_g
-    );
-    if (!validateCalories(entry.calories, entry.macros.protein_g, entry.macros.carbs_g, entry.macros.fat_g)) {
+  if (typeof entry.calories === 'number') {
+    // Validate that calories are non-negative
+    if (entry.calories < 0) {
+      invalid.push('calories');
+    }
+
+    // Validate that calories are consistent
+    if (!validateCalories(entry.calories, entry.macros.protein, entry.macros.carbs, entry.macros.fat)) {
       inconsistent.push('calories');
     }
   }
 
   // Validate that macros are non-negative
-  if (entry.macros.protein_g < 0 || entry.macros.carbs_g < 0 || entry.macros.fat_g < 0) {
+  if (entry.macros.protein < 0 || entry.macros.carbs < 0 || entry.macros.fat < 0) {
     invalid.push('macros');
   }
 
@@ -167,7 +173,7 @@ function validateEntry(entry: Omit<NormalizedEntry, 'issues'>): NormalizedEntry 
   // Build issues object only with non-empty arrays
   const issues: NormalizedEntry['issues'] = {
     ...(invalid.length > 0 && {invalid}),
-    ...(unkown.length > 0 && {unkown}),
+    ...(unknown.length > 0 && {unknown}),
     ...(inconsistent.length > 0 && {inconsistent}),
   };
 
@@ -179,24 +185,44 @@ function validateEntry(entry: Omit<NormalizedEntry, 'issues'>): NormalizedEntry 
 
 // Normalize Source A entries
 function normalizeSourceA(entry: SourceAEntry): NormalizedEntry {
+  const unknownFields: Array<keyof NormalizedEntry> = [];
+  
+  // Check for null/undefined values (runtime safety check)
+  if (Object.values(entry.macros).some(val => typeof (+val) !== 'number')) {
+    unknownFields.push('macros');
+  }
+  
+  if (typeof entry.calories_kcal !== 'number') {
+    unknownFields.push('calories');
+  }
+  
   const normalized = {
     id: entry.entryId,
     timestamp: entry.timestamp,
     foodName: entry.foodName,
     serving: entry.serving,
     macros: {
-      protein_g: entry.macros.protein_g,
-      carbs_g: entry.macros.carbs_g,
-      fat_g: entry.macros.fat_g,
+      protein: entry.macros.protein_g,
+      carbs: entry.macros.carbs_g,
+      fat: entry.macros.fat_g,
     },
     calories: entry.calories_kcal,
   };
-  return validateEntry(normalized);
+  return validateEntry(normalized, unknownFields);
 }
 
 // Normalize Source B entries
 function normalizeSourceB(entry: SourceBEntry): NormalizedEntry {
   const serving = parseServingSize(entry.servingSize);
+  const unknownFields: Array<keyof NormalizedEntry> = [];
+  
+  if (Object.values(entry.macros).some(val => typeof (+val) !== 'number')) {
+    unknownFields.push('macros');
+  }
+  // Track undefined calories (null is allowed, strings get converted)
+  if (!entry.calories) {
+    unknownFields.push('calories');
+  }
   
   const normalized = {
     id: entry.id,
@@ -204,45 +230,58 @@ function normalizeSourceB(entry: SourceBEntry): NormalizedEntry {
     foodName: entry.name,
     serving,
     macros: {
-      protein_g: toNumber(entry.macros.protein),
-      carbs_g: toNumber(entry.macros.carbs),
-      fat_g: toNumber(entry.macros.fat),
+      protein: toNumber(entry.macros.protein),
+      carbs: toNumber(entry.macros.carbs),
+      fat: toNumber(entry.macros.fat),
     },
     calories: toNumberOrNull(entry.calories),
     metadata: entry.extra ? { extra: entry.extra } : undefined,
   };
-  return validateEntry(normalized);
+  return validateEntry(normalized, unknownFields);
 }
 
 // Normalize Source C entries
 function normalizeSourceC(entry: SourceCEntry): NormalizedEntry {
   // Extract macros from nutrients array
   const macros = {
-    protein_g: 0,
-    carbs_g: 0,
-    fat_g: 0,
+    protein: 0,
+    carbs: 0,
+    fat: 0,
   };
   
   let calories_kcal: number | null = null;
+  const unknownFields: Array<keyof NormalizedEntry> = [];
   
-  // Process nutrients array - handle duplicates by summing
-  const nutrientMap = new Map<string, number>();
+  let hasProtein = false;
+  let hasCarbs = false;
+  let hasFat = false;
+  let hasEnergy = false;
+  
+  // Process nutrients array - use last value for duplicates
   for (const nutrient of entry.nutrients) {
     const key = nutrient.key.toLowerCase();
     if (key === 'protein') {
-      nutrientMap.set('protein', (nutrientMap.get('protein') || 0) + nutrient.value);
+      macros.protein = nutrient.value;
+      hasProtein = true;
     } else if (key === 'carbohydrate' || key === 'carbs') {
-      nutrientMap.set('carbs', (nutrientMap.get('carbs') || 0) + nutrient.value);
+      macros.carbs = nutrient.value;
+      hasCarbs = true;
     } else if (key === 'fat') {
-      nutrientMap.set('fat', (nutrientMap.get('fat') || 0) + nutrient.value);
+      macros.fat = nutrient.value;
+      hasFat = true;
     } else if (key === 'energy') {
       calories_kcal = nutrient.value;
+      hasEnergy = true;
     }
   }
   
-  macros.protein_g = nutrientMap.get('protein') || 0;
-  macros.carbs_g = nutrientMap.get('carbs') || 0;
-  macros.fat_g = nutrientMap.get('fat') || 0;
+  // Track missing nutrients
+  if ([hasProtein, hasCarbs, hasFat].some(val => !val)) {
+    unknownFields.push('macros');
+  }
+  if ([hasEnergy].some(val => !val)) {
+    unknownFields.push('calories');
+  }
   
   const metadata: Record<string, unknown> = {};
   if (entry.source) metadata.source = entry.source;
@@ -260,7 +299,7 @@ function normalizeSourceC(entry: SourceCEntry): NormalizedEntry {
     calories: calories_kcal,
     metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
   };
-  return validateEntry(normalized);
+  return validateEntry(normalized, unknownFields);
 }
 
 // Normalize Source D entries
@@ -268,20 +307,30 @@ function normalizeSourceD(entry: SourceDEntry): NormalizedEntry {
   const metadata: Record<string, unknown> = {};
   if (entry.macros_basis) metadata.macros_basis = entry.macros_basis;
   
+  const unknownFields: Array<keyof NormalizedEntry> = [];
+  
+  // Check for null/undefined values (runtime safety check)
+  if (Object.values(entry.macros).some(val => typeof (+val) !== 'number')) {
+    unknownFields.push('macros');
+  }
+  if (typeof entry.calories_kcal !== 'number') {
+    unknownFields.push('calories');
+  }
+  
   const normalized = {
     id: entry.id,
     timestamp: entry.time,
     foodName: entry.food,
     serving: entry.serving,
     macros: {
-      protein_g: entry.macros.protein_g,
-      carbs_g: entry.macros.carbs_g,
-      fat_g: entry.macros.fat_g,
+      protein: entry.macros.protein_g,
+      carbs: entry.macros.carbs_g,
+      fat: entry.macros.fat_g,
     },
     calories: entry.calories_kcal,
     metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
   };
-  return validateEntry(normalized);
+  return validateEntry(normalized, unknownFields);
 }
 
 // Main normalization function that detects source type and normalizes accordingly
@@ -317,16 +366,12 @@ export function normalizeEntries(data: unknown[]): NormalizedEntry[] {
   throw new Error('Unknown data source format');
 }
 
-export function calculateCalories(macros: { protein_g: number; carbs_g: number; fat_g: number }): number {
-  return macros.protein_g * 4 + macros.carbs_g * 4 + macros.fat_g * 9;
-}
-
-export function calcCalories(p = 0, c = 0, f = 0) {
+function calcCalories(p = 0, c = 0, f = 0) {
   return (p * 4) + (c * 4) + (f * 9);
 }
 
-export function validateCalories(givenCalories: number | undefined = undefined, p = 0, c = 0, f = 0) {
+function validateCalories(givenCalories: number | undefined = undefined, p = 0, c = 0, f = 0) {
   if (typeof givenCalories !== 'number') return false;
   const calculatedCalories = calcCalories(p, c, f);
-  return (calculatedCalories/3) >= Math.abs(calculatedCalories - givenCalories);
+  return Math.abs(calculatedCalories)/3 >= Math.abs(Math.abs(calculatedCalories) - Math.abs(givenCalories));
 }

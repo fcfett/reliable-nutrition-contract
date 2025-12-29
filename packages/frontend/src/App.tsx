@@ -13,7 +13,10 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
     <div className="max-w-7xl mx-auto p-8 text-center relative z-10">
-      <h1 className="text-4xl font-bold my-4 leading-tight">Reliable Nutrition Contract</h1>
+      <h1 className="text-4xl font-bold my-4 leading-tight">
+        Reliable Nutrition Contract&nbsp;
+        <figure className='inline-block scale-90' aria-label='broccoli and apple emojis'>🥦🍎</figure>
+      </h1>
       <APITester />
     </div>
     </QueryClientProvider>
