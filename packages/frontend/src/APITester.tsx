@@ -1,7 +1,7 @@
 import { useRef, useState, Fragment, type FormEvent } from "react";
 
 import {useQuery} from '@tanstack/react-query'
-import {twMerge} from 'tailwind-merge'
+import { twMerge } from 'tailwind-merge';
 
 const API_PATH = 'http://localhost:3000'
 const SOURCES = ['a', 'b', 'c', 'd', 'x', 'y'];
